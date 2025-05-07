@@ -109,27 +109,95 @@ function clearAllMarkers() {
 }
 
 // 在指板上标记音阶音符
+// 新增音阶模式状态
+let scaleMode = 'diatonic';
+
+// 新增：五声音阶按钮
+const pentatonicBtn = document.createElement('button');
+pentatonicBtn.id = 'pentatonicBtn';
+pentatonicBtn.textContent = '五声音阶';
+pentatonicBtn.style.marginLeft = '10px';
+document.querySelector('.controls').appendChild(pentatonicBtn);
+
+// 新增：琶音按钮
+const arpeggioBtn = document.createElement('button');
+arpeggioBtn.id = 'arpeggioBtn';
+arpeggioBtn.textContent = '琶音';
+arpeggioBtn.style.marginLeft = '10px';
+document.querySelector('.controls').appendChild(arpeggioBtn);
+
+// 五声音阶计算
+function getPentatonicScale(root) {
+  const intervals = scaleType === 'major' ? [2,2,3,2,3] : [3,2,2,3,2];
+  let idx = allNotes.indexOf(root);
+  return [root, allNotes[(idx+intervals[0])%12], allNotes[(idx+intervals[0]+intervals[1])%12], 
+          allNotes[(idx+intervals[0]+intervals[1]+intervals[2])%12], allNotes[(idx+intervals[0]+intervals[1]+intervals[2]+intervals[3])%12]];
+}
+
+// 琶音计算
+function getArpeggio(root) {
+  const intervals = scaleType === 'major' ? [4,3,4] : [3,4,3];
+  let idx = allNotes.indexOf(root);
+  return [root, allNotes[(idx+intervals[0])%12], allNotes[(idx+intervals[0]+intervals[1])%12], 
+          allNotes[(idx+intervals[0]+intervals[1]+intervals[2])%12]];
+}
+
+// 更新音阶标记逻辑
 function markScaleNotes(root) {
-    clearAllMarkers();
-    let scale = scaleType === 'major' ? getMajorScale(root) : getMinorScale(root);
-    // 3、5、7度索引
-    const third = scaleType === 'major' ? scale[2] : scale[2];
-    const fifth = scaleType === 'major' ? scale[4] : scale[4];
-    const seventh = scaleType === 'major' ? scale[6] : scale[6];
-    for (let stringIndex = 0; stringIndex < 6; stringIndex++) {
-        for (let fretIndex = 1; fretIndex <= 15; fretIndex++) {
-            const noteAtPosition = getNoteAtPosition(stringIndex, fretIndex);
-            if (noteAtPosition === root) {
-                addDot(stringIndex, fretIndex, 'selected', 'R');
-            } else if (noteAtPosition === third) {
-                addDot(stringIndex, fretIndex, 'third', noteAtPosition);
-            } else if (noteAtPosition === fifth) {
-                addDot(stringIndex, fretIndex, 'fifth', noteAtPosition);
-            } else if (noteAtPosition === seventh) {
-                addDot(stringIndex, fretIndex, 'seventh', noteAtPosition);
-            }
-        }
+  clearAllMarkers();
+  let scale = [];
+  
+  if(scaleMode === 'pentatonic') {
+    scale = getPentatonicScale(root);
+  } else if(scaleMode === 'arpeggio') {
+    scale = getArpeggio(root);
+  } else {
+    scale = scaleType === 'major' ? getMajorScale(root) : getMinorScale(root);
+  }
+
+  // 根据模式设置标记规则
+  for (let stringIndex = 0; stringIndex < 6; stringIndex++) {
+    for (let fretIndex = 1; fretIndex <= 15; fretIndex++) {
+      const note = getNoteAtPosition(stringIndex, fretIndex);
+      
+      if(note === root) {
+        addDot(stringIndex, fretIndex, 'selected', 'R');
+      } else if(scaleMode === 'pentatonic' && scale.includes(note)) {
+        addDot(stringIndex, fretIndex, 'pentatonic', note);
+      } else if(scaleMode === 'arpeggio' && scale.includes(note)) {
+        addDot(stringIndex, fretIndex, 'arpeggio', note);
+      } else if(scaleMode === 'diatonic') {
+        // 保持原有逻辑
+        if(note === scale[2]) addDot(stringIndex, fretIndex, 'third', note);
+        if(note === scale[4]) addDot(stringIndex, fretIndex, 'fifth', note);
+        if(note === scale[6]) addDot(stringIndex, fretIndex, 'seventh', note);
+      }
     }
+  }
+}
+
+// 按钮事件监听
+pentatonicBtn.addEventListener('click', () => {
+  scaleMode = 'pentatonic';
+  updateDisplay();
+});
+
+arpeggioBtn.addEventListener('click', () => {
+  scaleMode = 'arpeggio';
+  updateDisplay();
+});
+
+function updateDisplay() {
+  clearAllMarkers();
+  if(lastRootNote) {
+    markScaleNotes(lastRootNote);
+    noteInfoEl.innerHTML = `<strong>主音:</strong> ${lastRootNote} | 
+      <strong>模式:</strong> ${{
+        'diatonic': scaleType === 'major' ? '大调' : '小调',
+        'pentatonic': '五声音阶',
+        'arpeggio': '琶音'
+      }[scaleMode]}`;
+  }
 }
 
 function addDot(stringIndex, fretIndex, className, noteName) {
